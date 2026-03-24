@@ -350,18 +350,6 @@ CREATE DATABASE ecommercedb CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 ---
 
-## GitHub Submission
-
-```bash
-git init
-git add .
-git commit -m "Initial commit: BusyBrains E-Commerce App"
-git remote add origin https://github.com/YOUR_USERNAME/busybrains-ecommerce.git
-git push -u origin main
-```
-
----
-
 ## Testing with Postman
 
 1. **Login:** POST `http://localhost:8080/api/auth/login`
