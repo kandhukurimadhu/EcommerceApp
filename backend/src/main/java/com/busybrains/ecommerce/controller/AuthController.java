@@ -102,4 +102,8 @@ public class AuthController {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(Map.of("message", "Registration successful! Please log in."));
     }
+    @GetMapping("/health")
+   public ResponseEntity<String> health() {
+    return ResponseEntity.ok("OK");
+}
 }
