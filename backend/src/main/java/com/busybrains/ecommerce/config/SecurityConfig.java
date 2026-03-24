@@ -3,6 +3,7 @@ package com.busybrains.ecommerce.config;
 import com.busybrains.ecommerce.security.JwtAuthFilter;
 import com.busybrains.ecommerce.security.OAuth2SuccessHandler;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -26,19 +27,9 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.List;
 
-/**
- * Spring Security configuration class.
- *
- * Key configurations:
- * - Stateless JWT-based authentication
- * - OAuth2/Google SSO integration
- * - CORS for React frontend
- * - RBAC: Admin vs User endpoint restrictions
- * - BCrypt password encoding
- */
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity  // Enables @PreAuthorize annotations
+@EnableMethodSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
 
@@ -46,68 +37,47 @@ public class SecurityConfig {
     private final UserDetailsService userDetailsService;
     private final OAuth2SuccessHandler oAuth2SuccessHandler;
 
+    // Reads from application.properties — supports multiple origins comma-separated
+    @Value("${app.cors.allowed-origins:http://localhost:3000}")
+    private String allowedOrigins;
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            // Disable CSRF (not needed for stateless JWT APIs)
             .csrf(AbstractHttpConfigurer::disable)
-
-            // Configure CORS
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-
-            // Configure authorization rules
             .authorizeHttpRequests(auth -> auth
-                // Public endpoints - no authentication required
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers("/h2-console/**").permitAll()
                 .requestMatchers("/oauth2/**").permitAll()
                 .requestMatchers("/login/oauth2/**").permitAll()
-
-                // Products: GET is public, mutations require ADMIN role
                 .requestMatchers(HttpMethod.GET, "/api/products/**").authenticated()
                 .requestMatchers(HttpMethod.POST, "/api/products/**").hasAuthority("ROLE_ADMIN")
                 .requestMatchers(HttpMethod.PUT, "/api/products/**").hasAuthority("ROLE_ADMIN")
                 .requestMatchers(HttpMethod.DELETE, "/api/products/**").hasAuthority("ROLE_ADMIN")
-
-                // Profile management requires authentication
                 .requestMatchers("/api/profile/**").authenticated()
-
-                // Admin-only endpoints
                 .requestMatchers("/api/admin/**").hasAuthority("ROLE_ADMIN")
-
-                // All other requests require authentication
                 .anyRequest().authenticated()
             )
-
-            // Stateless session (JWT-based)
             .sessionManagement(session -> session
                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
             )
-
-            // OAuth2 Login configuration
             .oauth2Login(oauth2 -> oauth2
                 .successHandler(oAuth2SuccessHandler)
             )
-
-            // Set authentication provider
             .authenticationProvider(authenticationProvider())
-
-            // Add JWT filter before UsernamePasswordAuthenticationFilter
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
-
-            // Allow H2 console frames
             .headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()));
 
         return http.build();
     }
 
-    /**
-     * CORS configuration to allow requests from React frontend.
-     */
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of("http://localhost:3000"));
+        // Split by comma to support multiple origins (localhost + Railway frontend URL)
+        List<String> origins = List.of(allowedOrigins.split(","));
+        config.setAllowedOrigins(origins);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);
@@ -117,9 +87,6 @@ public class SecurityConfig {
         return source;
     }
 
-    /**
-     * DaoAuthenticationProvider uses our custom UserDetailsService and BCrypt.
-     */
     @Bean
     public AuthenticationProvider authenticationProvider() {
         DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
@@ -133,10 +100,6 @@ public class SecurityConfig {
         return config.getAuthenticationManager();
     }
 
-    /**
-     * BCrypt password encoder - industry standard for password hashing.
-     * Never store plain-text passwords!
-     */
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();

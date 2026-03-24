@@ -8,6 +8,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.core.user.OAuth2User;
@@ -17,11 +18,6 @@ import org.springframework.stereotype.Component;
 import java.io.IOException;
 import java.util.List;
 
-/**
- * Handles successful OAuth2 login (e.g., Google SSO).
- * Creates a user in DB if first-time login, then generates a JWT token
- * and redirects the frontend with the token as a query parameter.
- */
 @Component
 @RequiredArgsConstructor
 @Slf4j
@@ -29,6 +25,10 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
 
     private final UserRepository userRepository;
     private final JwtUtils jwtUtils;
+
+    // Set FRONTEND_URL env var in Railway → e.g. https://your-app.up.railway.app
+    @Value("${FRONTEND_URL:http://localhost:3000}")
+    private String frontendUrl;
 
     @Override
     public void onAuthenticationSuccess(
@@ -39,17 +39,15 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
 
         OAuth2User oAuth2User = (OAuth2User) authentication.getPrincipal();
 
-        String email = oAuth2User.getAttribute("email");
-        String name = oAuth2User.getAttribute("name");
-        String picture = oAuth2User.getAttribute("picture");
-        String providerId = oAuth2User.getAttribute("sub"); // Google's unique user ID
+        String email     = oAuth2User.getAttribute("email");
+        String name      = oAuth2User.getAttribute("name");
+        String picture   = oAuth2User.getAttribute("picture");
+        String providerId = oAuth2User.getAttribute("sub");
 
         log.info("OAuth2 login success for email: {}", email);
 
-        // Find or create user
         User user = userRepository.findByEmail(email).orElseGet(() -> {
             String username = email.split("@")[0];
-            // Ensure username uniqueness
             String finalUsername = username;
             int counter = 1;
             while (userRepository.existsByUsername(finalUsername)) {
@@ -69,7 +67,6 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
                     .build());
         });
 
-        // Build UserDetails to generate JWT
         org.springframework.security.core.userdetails.UserDetails userDetails =
                 org.springframework.security.core.userdetails.User.builder()
                         .username(user.getUsername())
@@ -79,8 +76,8 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
 
         String token = jwtUtils.generateToken(userDetails);
 
-        // Redirect to frontend with token
-        String redirectUrl = "http://localhost:3000/oauth2/callback?token=" + token;
+        // Use FRONTEND_URL env var — works for both local and Railway
+        String redirectUrl = frontendUrl + "/oauth2/callback?token=" + token;
         getRedirectStrategy().sendRedirect(request, response, redirectUrl);
     }
 }

@@ -2,16 +2,15 @@ import axios from 'axios';
 
 /**
  * Axios instance pre-configured for the Spring Boot backend.
- * All requests go through this instance so the JWT header
- * is automatically attached after login.
+ * In production, set REACT_APP_API_URL to your Railway backend URL.
+ * Falls back to localhost:8080 for local development.
  */
 const api = axios.create({
-  baseURL: 'http://localhost:8080',
+  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:8080',
   headers: { 'Content-Type': 'application/json' },
 });
 
 // ── Request Interceptor ─────────────────────────────────────────────────────
-// Attach JWT from localStorage on every request (backup in case context lost)
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
@@ -24,7 +23,6 @@ api.interceptors.request.use(
 );
 
 // ── Response Interceptor ────────────────────────────────────────────────────
-// Handle 401 (expired/invalid token) globally: clear session and redirect
 api.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -32,7 +30,6 @@ api.interceptors.response.use(
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       delete api.defaults.headers.common['Authorization'];
-      // Only redirect if not already on login/register
       if (!window.location.pathname.includes('/login') &&
           !window.location.pathname.includes('/register')) {
         window.location.href = '/login';
