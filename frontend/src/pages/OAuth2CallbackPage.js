@@ -14,6 +14,7 @@ export default function OAuth2CallbackPage() {
   const { loginWithToken } = useAuth();
   const navigate = useNavigate();
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const token = searchParams.get('token');
 
@@ -32,7 +33,7 @@ export default function OAuth2CallbackPage() {
         toast.error('SSO login failed. Please try again.');
         navigate('/login');
       });
-  }, []);
+  }, []); // intentionally empty — runs once on mount only
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column',
